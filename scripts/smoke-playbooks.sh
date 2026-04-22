@@ -11,7 +11,7 @@
 # How it works:
 #   1. Each selected job is queued via `hermes cron run <job_id>` (flips next_run_at=now)
 #   2. Then `hermes cron tick` fires all due jobs once
-#   3. Between runs, the script sleeps briefly so runs don't overlap
+#   3. The script polls Hermes job state + Minx playbook_runs until the new run is terminal
 #
 # Caveat: `hermes cron tick` runs ALL due jobs — if a regular cron is due at the
 # same moment, it will also fire. Run this when you're NOT near a cron boundary.
@@ -20,6 +20,7 @@ set -euo pipefail
 
 JOBS_FILE="${HERMES_HOME:-$HOME/.hermes}/cron/jobs.json"
 MINX_DB="${MINX_DB:-$HOME/.minx/data/minx.db}"
+SMOKE_WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-600}"
 
 # Playbooks in dependency-friendly order.
 ALL_PLAYBOOKS=(
@@ -36,6 +37,20 @@ require() {
 
 require hermes
 require python3
+
+playbook_id_for_name() {
+  case "$1" in
+    daily-review) echo "daily_review" ;;
+    wiki-update) echo "wiki_update" ;;
+    memory-review) echo "memory_review" ;;
+    goal-nudge) echo "goal_nudge" ;;
+    weekly-review) echo "weekly_report" ;;
+    *)
+      echo "ERROR: unknown playbook name: $1" >&2
+      return 1
+      ;;
+  esac
+}
 
 lookup_job_id() {
   local name="$1"
@@ -65,31 +80,184 @@ cmd_list() {
 }
 
 cmd_history() {
-  require sqlite3
   echo "Last 20 playbook_runs rows:"
-  sqlite3 -header -column "$MINX_DB" "
-    SELECT
-      id,
-      playbook_id,
-      status,
-      trigger_type,
-      substr(COALESCE(trigger_ref, ''), 1, 24) AS trigger_ref,
-      substr(triggered_at, 1, 19) AS triggered_at,
-      substr(COALESCE(completed_at, ''), 1, 19) AS completed_at,
-      substr(COALESCE(error_message, ''), 1, 60) AS error
-    FROM playbook_runs
-    ORDER BY id DESC
-    LIMIT 20;
-  "
+  python3 - "$MINX_DB" <<'PY'
+import sqlite3
+import sys
+
+conn = sqlite3.connect(sys.argv[1])
+conn.row_factory = sqlite3.Row
+try:
+    rows = conn.execute(
+        """
+        SELECT
+          id,
+          playbook_id,
+          status,
+          trigger_type,
+          substr(COALESCE(trigger_ref, ''), 1, 24) AS trigger_ref,
+          substr(triggered_at, 1, 19) AS triggered_at,
+          substr(COALESCE(completed_at, ''), 1, 19) AS completed_at,
+          substr(COALESCE(error_message, ''), 1, 60) AS error
+        FROM playbook_runs
+        ORDER BY id DESC
+        LIMIT 20
+        """
+    ).fetchall()
+finally:
+    conn.close()
+
+headers = ["id", "playbook_id", "status", "trigger_type", "trigger_ref", "triggered_at", "completed_at", "error"]
+widths = {header: len(header) for header in headers}
+for row in rows:
+    for header in headers:
+        widths[header] = max(widths[header], len(str(row[header] or "")))
+
+print("  ".join(header.ljust(widths[header]) for header in headers))
+print("  ".join("-" * widths[header] for header in headers))
+for row in rows:
+    print("  ".join(str(row[header] or "").ljust(widths[header]) for header in headers))
+PY
+}
+
+max_run_id() {
+  local playbook_id="$1"
+  python3 - "$MINX_DB" "$playbook_id" <<'PY'
+import sqlite3
+import sys
+
+conn = sqlite3.connect(sys.argv[1])
+try:
+    row = conn.execute(
+        "SELECT COALESCE(MAX(id), 0) FROM playbook_runs WHERE playbook_id = ?",
+        (sys.argv[2],),
+    ).fetchone()
+finally:
+    conn.close()
+
+print(int(row[0] or 0))
+PY
+}
+
+job_last_run_at() {
+  local name="$1"
+  python3 - "$JOBS_FILE" "$name" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    jobs = json.load(f).get("jobs", [])
+for job in jobs:
+    if job.get("name") == sys.argv[2]:
+        print(job.get("last_run_at") or "")
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+wait_for_terminal_result() {
+  local name="$1"
+  local job_id="$2"
+  local playbook_id="$3"
+  local previous_run_id="$4"
+  local previous_last_run_at="$5"
+
+  python3 - "$MINX_DB" "$JOBS_FILE" "$name" "$job_id" "$playbook_id" "$previous_run_id" "$previous_last_run_at" "$SMOKE_WAIT_SECONDS" <<'PY'
+import json
+import sqlite3
+import sys
+import time
+
+db_path, jobs_file, name, job_id, playbook_id, previous_run_id_raw, previous_last_run_at, timeout_raw = sys.argv[1:9]
+previous_run_id = int(previous_run_id_raw)
+timeout_seconds = int(timeout_raw)
+deadline = time.monotonic() + timeout_seconds
+
+def load_job_state():
+    with open(jobs_file, encoding="utf-8") as f:
+        jobs = json.load(f).get("jobs", [])
+    for job in jobs:
+        if job.get("id") == job_id:
+            return {
+                "last_run_at": job.get("last_run_at"),
+                "last_status": job.get("last_status"),
+                "last_error": job.get("last_error"),
+            }
+    raise SystemExit(f"ERROR: job disappeared from jobs.json: {name} ({job_id})")
+
+def load_new_run():
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT id, status, triggered_at, completed_at, error_message
+            FROM playbook_runs
+            WHERE playbook_id = ? AND id > ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (playbook_id, previous_run_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return dict(row)
+
+while time.monotonic() < deadline:
+    job = load_job_state()
+    run = load_new_run()
+    job_started = bool(job["last_run_at"]) and job["last_run_at"] != (previous_last_run_at or None)
+
+    if job_started and job["last_status"] == "error":
+        error_text = job["last_error"] or "unknown Hermes cron error"
+        print(f"  ✗ Hermes job failed: {error_text}")
+        raise SystemExit(2)
+
+    if run is not None and run["status"] in {"succeeded", "skipped", "failed"}:
+        print(f"  audit row: id={run['id']} status={run['status']} triggered_at={run['triggered_at']}")
+        if run["completed_at"]:
+            print(f"  completed_at: {run['completed_at']}")
+        if run["error_message"]:
+            print(f"  error: {run['error_message']}")
+        if run["status"] == "failed":
+            raise SystemExit(3)
+        if job_started and job["last_status"] not in (None, "ok"):
+            print(f"  ✗ Hermes job status unexpected: {job['last_status']}")
+            raise SystemExit(4)
+        raise SystemExit(0)
+
+    time.sleep(2)
+
+job = load_job_state()
+run = load_new_run()
+if run is None and job.get("last_status") == "ok":
+    print("  ✗ Hermes job completed but no new terminal playbook_runs row was recorded")
+else:
+    print(
+        "  ✗ timed out waiting for terminal result "
+        f"(job.last_status={job.get('last_status')}, new_run={'yes' if run else 'no'})"
+    )
+raise SystemExit(5)
+PY
 }
 
 run_one() {
   local name="$1"
   local job_id
+  local playbook_id
+  local previous_run_id
+  local previous_last_run_at
   if ! job_id=$(lookup_job_id "$name" 2>/dev/null); then
     echo "  ✗ $name — not found in jobs.json"
     return 1
   fi
+  if ! playbook_id=$(playbook_id_for_name "$name"); then
+    return 1
+  fi
+  previous_run_id="$(max_run_id "$playbook_id")"
+  previous_last_run_at="$(job_last_run_at "$name")"
 
   echo ""
   echo "▶ Running: $name ($job_id)"
@@ -104,11 +272,12 @@ run_one() {
     return 1
   fi
 
-  echo "  ✓ queued and ticked"
+  echo "  queued; waiting for terminal audit row..."
+  if ! wait_for_terminal_result "$name" "$job_id" "$playbook_id" "$previous_run_id" "$previous_last_run_at"; then
+    return 1
+  fi
 
-  # Give the scheduler a moment to hand off the job before the next iteration,
-  # so overlapping playbook_runs don't confuse playbook_history.
-  sleep 3
+  echo "  ✓ terminal status recorded"
 }
 
 main() {

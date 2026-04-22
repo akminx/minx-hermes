@@ -22,15 +22,17 @@ skills and scripts out of the NousResearch upstream (which we never push to).
 ```
 skills/minx/              Minx playbook skills, symlinked into ~/.hermes/skills/minx/
   daily-review/SKILL.md
+  finance-import/SKILL.md
   wiki-update/SKILL.md
   memory-review/SKILL.md
   goal-nudge/SKILL.md
   weekly-review/SKILL.md
 scripts/
-  smoke-playbooks.sh      Ping each playbook cron job end-to-end
-  snapshot-cron-jobs.sh   Snapshot the 5 playbook jobs from ~/.hermes/cron/jobs.json
+  configure-finance-import-flow.sh  Bind #finances to the finance-import skill and sync the live symlink
+  smoke-playbooks.sh      Queue a playbook and wait for terminal audit status
+  snapshot-cron-jobs.sh   Snapshot the 5 playbooks plus reconcile sweep from ~/.hermes/cron/jobs.json
 cron/
-  jobs.snapshot.json      Deterministic snapshot of the 5 playbook cron jobs
+  jobs.snapshot.json      Deterministic snapshot of the Minx cron jobs
 docs/
   plans/                  Hermes infra plans
   slice8-handoff.md       Handoff for future Claude sessions
@@ -52,6 +54,13 @@ Refresh the cron snapshot after editing a playbook schedule:
 git diff cron/jobs.snapshot.json
 ```
 
+Install or re-apply the one-step Discord finance import flow:
+
+```
+./scripts/configure-finance-import-flow.sh
+./scripts/configure-finance-import-flow.sh --check
+```
+
 Smoke-test a single playbook end-to-end:
 
 ```
@@ -59,6 +68,10 @@ Smoke-test a single playbook end-to-end:
 ./scripts/smoke-playbooks.sh daily-review
 ./scripts/smoke-playbooks.sh --history         # recent playbook_runs rows
 ```
+
+`smoke-playbooks.sh` now waits for a new terminal `playbook_runs` row instead of
+reporting success right after `hermes cron tick`. Override the wait budget with
+`SMOKE_WAIT_SECONDS=<seconds>` if a playbook needs a longer window.
 
 Both scripts assume the Minx MCP stack is up (ports 8000-8003); start it with
 `~/Documents/minx-mcp/scripts/start_hermes_stack.sh`.

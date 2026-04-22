@@ -19,13 +19,14 @@ Owns the `memory_review` playbook. `requires_confirmation=True` in the registry 
 
 1. `run_id = minx_core.start_playbook_run(playbook_id='memory_review', harness='hermes', trigger_type='cron', trigger_ref=<cron_name>)` — silent exit on CONFLICT.
 2. Execute workflow.
-3. Complete with `result_json={"surfaced": N, "confirmed": C, "rejected": R, "deferred": D}`.
+3. Complete immediately after surfacing candidates with `result_json={"surfaced": N, "pending_ids": [...], "review_note_path": ...}`.
 4. On skip (no pending candidates): `status='skipped'`, `conditions_met=False`.
 
 ## Data Sources
 - `minx_core.get_pending_memory_candidates(scope?, limit=10)`
 - `minx_core.memory_confirm(memory_id, actor='user_via_hermes')`
 - `minx_core.memory_reject(memory_id, actor='user_via_hermes', reason?)`
+- `minx_core.persist_note(relative_path, content, overwrite=true)`
 
 ## Workflow
 
@@ -34,7 +35,7 @@ Owns the `memory_review` playbook. `requires_confirmation=True` in the registry 
 - If result is empty: complete with `status='skipped'`, exit silently.
 
 ### 2) Post confirmation prompt
-Single post to `#journal` listing each candidate with an index number. For each candidate include:
+Single post to `#journal` listing each candidate with both an index number and the durable `memory_id`. For each candidate include:
 - `memory_type` + `scope` + `subject`
 - Short payload summary (e.g., for `preference`: "prefers X over Y"; for `entity_fact`: "entity=X, value=Y"; for `pattern`: "X happens at Y")
 - `confidence` score
@@ -43,38 +44,45 @@ Single post to `#journal` listing each candidate with an index number. For each 
 End the post with exact reply instructions:
 ```
 Reply with:
-- `confirm 1,3,5` to confirm candidates by index
-- `reject 2,4` to reject (optional: add a reason, e.g. `reject 2 reason=wrong`)
-- `skip` to leave them pending
-- `skip 1,2` to defer specific ones
+- `memory confirm 123,456` to confirm by memory_id
+- `memory reject 789 reason=wrong` to reject by memory_id
+- `memory skip 123` to leave a specific candidate pending
+- `memory review status` to reprint the current pending set
 ```
 
-### 3) Wait for user reply
-Listen for a message in `#journal` matching the reply pattern. Timeout: 30 minutes. If no reply, complete with `status='skipped'`, `action_taken=False`, reason="user did not respond".
+### 3) Persist the surfaced set and complete immediately
+- Write a durable note to `Minx/System/memory-review-pending.md` containing:
+  - `reviewed_at`
+  - the surfaced `memory_id` values
+  - short summaries
+  - the exact reply commands above
+- Complete the playbook run right after the post/note write. Cron must not wait for a human reply.
 
-### 4) Apply user decisions
-For each confirmed index:
+### 4) Later replies are handled out-of-band
+If the user replies later in `#journal`, Hermes handles that in a normal interactive turn by calling:
 - `memory_confirm(memory_id=<id>, actor='user_via_hermes')`
-For each rejected index:
 - `memory_reject(memory_id=<id>, actor='user_via_hermes', reason=<text or null>)`
-Skipped indices: leave alone (stay pending for the next run).
 
-### 5) Acknowledge
-Post a short confirmation line to `#journal`: `"Memory review: confirmed N, rejected M, deferred K."`
+The cron playbook itself does not stay alive waiting for that reply.
+
+### 5) Acknowledge only what cron actually did
+Post a short confirmation line to `#journal`: `"Memory review: surfaced N pending candidates. Reply with memory IDs when you're ready."`
 
 ## Rules
-1. **Never auto-confirm**. This playbook is confirmation-gated — no memory changes without explicit user reply.
+1. **Never auto-confirm**. This playbook is confirmation-gated — no memory changes during the cron run.
 2. **Cap per run**: 10 candidates max so the user can actually skim them. Backlog drains across runs.
 3. **Actor must be `user_via_hermes`** so audit history distinguishes human decisions from vault sync or detector promotions.
-4. **Respect CONFLICT errors** on confirm/reject: if a memory was auto-promoted or expired between surface and reply, skip it and note in the acknowledgement.
-5. **Idempotency**: if the user replies twice, the second pass finds fewer pending rows (already confirmed/rejected) and behaves normally. Do not error on "not found."
+4. **Surface stable IDs**. The post and durable note must include `memory_id` so later replies are not tied to ephemeral list ordering.
+5. **Respect CONFLICT errors** on later confirm/reject: if a memory was auto-promoted or expired between surface and reply, skip it and note that in the follow-up acknowledgement.
+6. **Idempotency**: if the user replies twice, the second pass finds fewer pending rows (already confirmed/rejected) and behaves normally. Do not error on "not found."
+7. **Cron budget awareness**: do not block on a human. The playbook must finish well within Hermes' cron timeout / reconcile window.
 
 ## Failure Modes
 - CONFLICT on `start_playbook_run`: silent exit.
 - Empty backlog: `status='skipped'`, no post.
-- User no-reply: `status='skipped'`, `action_taken=False`.
-- `memory_confirm`/`memory_reject` CONFLICT (memory already terminal): log, skip that index, continue; reflect in acknowledgement.
-- Malformed user reply: post clarification in `#journal`, wait up to 5 more minutes for corrected reply before giving up.
+- `persist_note` fails after the Discord post: complete with `status='failed'` so the surfaced batch is not "lost" without a durable reference.
+- Later `memory_confirm`/`memory_reject` CONFLICT (memory already terminal): log, skip that ID, continue; reflect in the follow-up acknowledgement.
+- Malformed later user reply: ask for corrected `memory confirm|reject <ids>` syntax in the interactive turn. Do not reopen the original cron run.
 
 ## Bulletproof Audit Contract
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Snapshot the 5 Minx playbook cron jobs from ~/.hermes/cron/jobs.json
+# Snapshot the Minx playbook + maintenance cron jobs from ~/.hermes/cron/jobs.json
 # into a clean, deterministic JSON file in this repo for version control.
 #
 # Volatile runtime fields (last_run_at, next_run_at, state, etc.) are stripped
@@ -31,12 +31,13 @@ from pathlib import Path
 src = Path(sys.argv[1])
 dst = Path(sys.argv[2])
 
-PLAYBOOK_NAMES = {
+JOB_NAMES = {
     "daily-review",
     "wiki-update",
     "memory-review",
     "goal-nudge",
     "weekly-review",
+    "playbook-reconcile-sweep",
 }
 
 VOLATILE_TOP = {
@@ -55,7 +56,7 @@ jobs = data.get("jobs", data) if isinstance(data, dict) else data
 
 selected = []
 for job in jobs:
-    if job.get("name") not in PLAYBOOK_NAMES:
+    if job.get("name") not in JOB_NAMES:
         continue
     clean = {k: v for k, v in job.items() if k not in VOLATILE_TOP}
     # strip repeat.completed if present

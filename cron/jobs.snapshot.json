@@ -6,11 +6,11 @@
       "deliver": "discord:1487244033796345926",
       "enabled": true,
       "id": "c1a8b3f02d41",
-      "model": null,
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "name": "daily-review",
       "origin": null,
       "prompt": "Run the Minx daily review playbook. Fetch today's snapshot and insights, fill the wiki review template, persist to Minx/Reviews/YYYY-MM-DD.md, and post a short digest to #reports. If the day is empty, skip silently. Wrap in start_playbook_run/complete_playbook_run.",
-      "provider": null,
+      "provider": "openrouter",
       "repeat": {
         "times": null
       },
@@ -31,11 +31,11 @@
       "deliver": "discord:1487244001315913788",
       "enabled": true,
       "id": "f5c8b13d9e47",
-      "model": null,
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "name": "goal-nudge",
       "origin": null,
       "prompt": "Run the Minx goal nudge playbook. Evaluate each active goal's trajectory and post concrete, data-cited nudges to #journal for at most 3 at-risk goals. Respect recent snoozes. Never auto-modify goals. Wrap in start_playbook_run/complete_playbook_run.",
-      "provider": null,
+      "provider": "openrouter",
       "repeat": {
         "times": null
       },
@@ -56,11 +56,11 @@
       "deliver": "discord:1487244001315913788",
       "enabled": true,
       "id": "e4f91a2b7c53",
-      "model": null,
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "name": "memory-review",
       "origin": null,
-      "prompt": "Run the Minx memory candidate review playbook. Surface up to 10 pending memory candidates to #journal with confirm/reject/skip instructions. Wait up to 30 minutes for a user reply, then apply decisions via memory_confirm/memory_reject. Acknowledge counts. Wrap in start_playbook_run/complete_playbook_run.",
-      "provider": null,
+      "prompt": "Run the Minx memory candidate review playbook. Surface up to 10 pending memory candidates to #journal with durable memory IDs and exact follow-up commands, persist the surfaced set to Minx/System/memory-review-pending.md, and complete the playbook immediately after surfacing. Do not wait in cron for a user reply. Wrap in start_playbook_run/complete_playbook_run.",
+      "provider": "openrouter",
       "repeat": {
         "times": null
       },
@@ -77,15 +77,38 @@
     },
     {
       "base_url": null,
+      "created_at": "2026-04-22T03:00:29.645570-05:00",
+      "deliver": "discord:1487244033796345926",
+      "enabled": true,
+      "id": "bbb726daf813",
+      "model": "nvidia/nemotron-3-super-120b-a12b",
+      "name": "playbook-reconcile-sweep",
+      "origin": null,
+      "prompt": "Run the Minx playbook reconcile sweep. Call minx_core.playbook_reconcile_crashed(stale_after_minutes=15) exactly once. If reconciled is 0, emit [SILENT]. If reconciled is greater than 0, post a short alert to #reports with the reconciled count and run_ids. Do not run other Minx playbooks.",
+      "provider": "openrouter",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "*/15 * * * *",
+        "expr": "*/15 * * * *",
+        "kind": "cron"
+      },
+      "schedule_display": "*/15 * * * *",
+      "skill": null,
+      "skills": []
+    },
+    {
+      "base_url": null,
       "created_at": "2026-04-20T00:00:00-05:00",
       "deliver": "discord:1487244033796345926",
       "enabled": true,
       "id": "a9e71f4c3b82",
-      "model": null,
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "name": "weekly-review",
       "origin": null,
       "prompt": "Run the Minx weekly_report playbook. Resolve previous full ISO week (Mon-Sun). Render finance_generate_weekly_report, then synthesize one cross-domain digest across finance, training, meals/nutrition, and goals. Post digest to #reports with link to the finance report vault path. Wrap in start_playbook_run/complete_playbook_run.",
-      "provider": null,
+      "provider": "openrouter",
       "repeat": {
         "times": null
       },
@@ -106,11 +129,11 @@
       "deliver": "discord:1487244033796345926",
       "enabled": true,
       "id": "b2d74fe98a15",
-      "model": null,
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "name": "wiki-update",
       "origin": null,
       "prompt": "Run the Minx wiki maintenance playbook. Refresh at most 10 stale wiki pages for active memories using the entity/pattern/goal scaffolds. Skip unchanged pages. Only post to #reports if pages_written > 0. Wrap in start_playbook_run/complete_playbook_run.",
-      "provider": null,
+      "provider": "openrouter",
       "repeat": {
         "times": null
       },
