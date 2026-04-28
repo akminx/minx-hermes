@@ -23,6 +23,7 @@ skills and scripts out of the NousResearch upstream (which we never push to).
 skills/minx/              Minx playbook skills, symlinked into ~/.hermes/skills/minx/
   daily-review/SKILL.md
   finance-import/SKILL.md
+  investigate/SKILL.md
   wiki-update/SKILL.md
   memory-review/SKILL.md
   goal-nudge/SKILL.md
@@ -30,6 +31,7 @@ skills/minx/              Minx playbook skills, symlinked into ~/.hermes/skills/
 scripts/
   configure-finance-import-flow.sh  Bind #finances to the finance-import skill and sync the live symlink
   smoke-playbooks.sh      Queue a playbook and wait for terminal audit status
+  smoke-investigations.sh Wrap a Hermes investigation command and wait for terminal audit status
   snapshot-cron-jobs.sh   Snapshot the 5 playbooks plus reconcile sweep from ~/.hermes/cron/jobs.json
 cron/
   jobs.snapshot.json      Deterministic snapshot of the Minx cron jobs
@@ -72,6 +74,19 @@ Smoke-test a single playbook end-to-end:
 `smoke-playbooks.sh` now waits for a new terminal `playbook_runs` row instead of
 reporting success right after `hermes cron tick`. Override the wait budget with
 `SMOKE_WAIT_SECONDS=<seconds>` if a playbook needs a longer window.
+
+Smoke-test an investigation flow after triggering Hermes:
+
+```
+./scripts/smoke-investigations.sh --check-schema
+./scripts/smoke-investigations.sh --history
+./scripts/smoke-investigations.sh -- <command that triggers minx_investigate>
+```
+
+The investigation smoke script snapshots the current max `investigations.id`,
+runs the supplied command without `eval`, then waits for a new terminal
+`investigations` row (`succeeded`, `budget_exhausted`, `failed`, or
+`cancelled`). Override the wait budget with `SMOKE_WAIT_SECONDS=<seconds>`.
 
 Both scripts assume the Minx MCP stack is up (ports 8000-8003); start it with
 `~/Documents/minx-mcp/scripts/start_hermes_stack.sh`.
