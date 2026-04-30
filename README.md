@@ -40,6 +40,7 @@ cron/
   jobs.snapshot.json      Deterministic snapshot of the Minx cron jobs
 docs/
   plans/                  Hermes infra plans
+  discord-flow-smoke-runbook.md  Discord lane and investigation smoke checklist
   slice8-handoff.md       Handoff for future Claude sessions
 ```
 
@@ -111,3 +112,6 @@ Smoke-test a deterministic investigation:
 
 Both scripts assume the Minx MCP stack is up (ports 8000-8003); start it with
 `~/Documents/minx-mcp/scripts/start_hermes_stack.sh`.
+
+After Discord channel, Hermes, or model changes, run the full lane checklist in
+`docs/discord-flow-smoke-runbook.md`.
