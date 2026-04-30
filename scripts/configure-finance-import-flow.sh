@@ -102,7 +102,9 @@ channel_directory = discord.get("channel_directory") or {}
 if not isinstance(channel_directory, dict):
     raise SystemExit("Expected `discord.channel_directory` to be a mapping")
 
-finance_channel_id = str(channel_directory.get("finances", "")).strip()
+finance_channel_id = str(
+    channel_directory.get("finance") or channel_directory.get("finances", "")
+).strip()
 if not finance_channel_id:
     raise SystemExit("Could not resolve discord.channel_directory.finances from config.yaml")
 

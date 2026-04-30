@@ -30,6 +30,9 @@ Usage:
 
 Environment variables consumed:
     OPENROUTER_API_KEY (required for live LLM calls)
+    MINX_INVESTIGATION_MODEL, MINX_INVESTIGATION_DATA_COLLECTION,
+    MINX_INVESTIGATION_REASONING_EFFORT, MINX_INVESTIGATION_QUANTIZATIONS,
+    MINX_INVESTIGATION_API_KEY_ENV
     MINX_CORE_URL, MINX_FINANCE_URL, MINX_MEALS_URL, MINX_TRAINING_URL
         (override defaults from ~/.hermes/config.yaml)
 """
@@ -75,7 +78,7 @@ def parse_args() -> argparse.Namespace:
         choices=("investigate", "plan", "retro", "onboard", "other"),
         default="investigate",
     )
-    parser.add_argument("--question", required=True)
+    parser.add_argument("--question")
     parser.add_argument("--context-json", default="{}", help="JSON dict of extra context.")
     parser.add_argument("--max-tool-calls", type=int, default=8)
     parser.add_argument("--wall-clock-s", type=float, default=90.0)
@@ -87,15 +90,25 @@ def parse_args() -> argparse.Namespace:
         "--base-url",
         default=os.environ.get("MINX_INVESTIGATION_BASE_URL", "https://openrouter.ai/api/v1"),
     )
-    parser.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
-    parser.add_argument("--reasoning-effort", choices=("low", "medium", "high", "off"), default="medium")
+    parser.add_argument(
+        "--api-key-env",
+        default=os.environ.get("MINX_INVESTIGATION_API_KEY_ENV", "OPENROUTER_API_KEY"),
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("low", "medium", "high", "off"),
+        default=os.environ.get("MINX_INVESTIGATION_REASONING_EFFORT", "medium"),
+    )
     parser.add_argument(
         "--data-collection",
         choices=("deny", "allow"),
-        default="deny",
+        default=os.environ.get("MINX_INVESTIGATION_DATA_COLLECTION", "deny"),
         help="OpenRouter routing: deny = no-logging providers only.",
     )
-    parser.add_argument("--quantizations", default="fp8,bf16")
+    parser.add_argument(
+        "--quantizations",
+        default=os.environ.get("MINX_INVESTIGATION_QUANTIZATIONS", "fp8,bf16"),
+    )
     parser.add_argument(
         "--core-url",
         default=os.environ.get("MINX_CORE_URL", "http://127.0.0.1:8001/mcp"),
@@ -131,6 +144,7 @@ def build_policy(args: argparse.Namespace) -> OpenAIToolCallingPolicy:
     )
     provider_preferences: dict[str, object] = {
         "data_collection": args.data_collection,
+        "zdr": True,
         "require_parameters": True,
         "allow_fallbacks": True,
     }
@@ -156,6 +170,9 @@ def build_policy(args: argparse.Namespace) -> OpenAIToolCallingPolicy:
 
 def main() -> int:
     args = parse_args()
+    if not args.print_config and not args.question:
+        print("--question is required unless --print-config is used", file=sys.stderr)
+        return 2
     try:
         context = json.loads(args.context_json)
     except json.JSONDecodeError as exc:
@@ -185,6 +202,7 @@ def main() -> int:
                     "api_key_env": args.api_key_env,
                     "reasoning_effort": args.reasoning_effort,
                     "data_collection": args.data_collection,
+                    "zdr": True,
                     "max_tool_calls": args.max_tool_calls,
                     "wall_clock_s": args.wall_clock_s,
                     "endpoints": endpoints.__dict__,

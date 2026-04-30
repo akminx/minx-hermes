@@ -112,6 +112,19 @@ The runner stitches together the budget-enforced agentic loop, the OpenAI tool-c
 
 Use `--print-config` to dump the resolved config without making LLM/MCP calls.
 
+The runner also accepts environment overrides:
+
+- `MINX_INVESTIGATION_MODEL`
+- `MINX_INVESTIGATION_DATA_COLLECTION`
+- `MINX_INVESTIGATION_REASONING_EFFORT`
+- `MINX_INVESTIGATION_QUANTIZATIONS`
+- `MINX_INVESTIGATION_API_KEY_ENV`
+
+Default routing stays private-first (`data_collection=deny`). If the paid
+OpenRouter route returns `402 Payment Required` during bootstrap, `openrouter/free`
+with `MINX_INVESTIGATION_DATA_COLLECTION=allow` is a temporary smoke path only,
+not the preferred route for personal data.
+
 ## Runtime Contract
 
 The live Hermes implementation follows `docs/hermes-investigation-runtime-contract.md`. Reference implementations in this repo:
