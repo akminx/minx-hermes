@@ -59,6 +59,11 @@ CHANNEL_PROMPTS = {
         "asks. Do not reference old SousChef vault recipes unless the user explicitly "
         "re-imports them."
     ),
+    "minx_ops": (
+        "This is #minx-ops, the private/admin lane for Hermes and Minx operations. Use it "
+        "for stack status, smoke tests, config drift, failed playbooks, failed investigations, "
+        "and operational alerts. Keep messages concise and action-oriented."
+    ),
 }
 
 
@@ -107,6 +112,16 @@ def normalize_minx_discord_config(config: dict[str, Any]) -> bool:
 
     if prompts != discord.get("channel_prompts"):
         discord["channel_prompts"] = prompts
+        changed = True
+
+    free_response_ids = [
+        str(normalized_directory[key])
+        for key in ("ask_minx", "finance", "training", "capture", "reports", "meals", "minx_ops")
+        if normalized_directory.get(key)
+    ]
+    free_response_value = ",".join(free_response_ids)
+    if discord.get("free_response_channels") != free_response_value:
+        discord["free_response_channels"] = free_response_value
         changed = True
 
     return changed

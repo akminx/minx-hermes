@@ -59,6 +59,7 @@ def test_normalize_channel_prompts_match_new_flow() -> None:
                 "capture": "4",
                 "reports": "5",
                 "meals": "6",
+                "minx_ops": "7",
             },
             "channel_prompts": {"1": "old"},
         }
@@ -74,6 +75,8 @@ def test_normalize_channel_prompts_match_new_flow() -> None:
     assert "stable preferences" in prompts["4"]
     assert "scheduled summaries" in prompts["5"]
     assert "meal logs" in prompts["6"]
+    assert "stack status" in prompts["7"]
+    assert config["discord"]["free_response_channels"] == "1,2,3,4,5,6,7"
 
 
 def test_validate_reports_missing_minx_ops_as_warning() -> None:
