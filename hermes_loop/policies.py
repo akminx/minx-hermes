@@ -4,8 +4,8 @@
 (direct OpenAI, Azure, Together, or OpenRouter) through the loop. It:
 
 - Manages an in-memory message history across turns.
-- Carries `reasoning_details` from the assistant message back into the next
-  request — Nemotron-3-Super requires this for multi-turn reasoning.
+- Carries provider-specific `reasoning_details` from the assistant message
+  back into the next request when present.
 - Translates the chat-side `tool_calls` response into the loop's
   `PolicyDecision`. The first tool call in the response wins; the loop is
   one-tool-per-turn by design (sequential reasoning, not fan-out).
@@ -211,8 +211,7 @@ def _summarize_for_model(step: StepRecord) -> str:
         result_text = json.dumps(step.raw_result, ensure_ascii=False)
     except (TypeError, ValueError):
         result_text = str(step.raw_result)
-    # Cap length — Nemotron's 262K window is generous but we don't need to
-    # dump megabytes; truncate at 32 KB and let the model ask follow-ups.
+    # Cap length so tool results remain useful without dumping megabytes.
     if len(result_text) > 32_000:
         result_text = result_text[:32_000] + "...[truncated]"
     return result_text

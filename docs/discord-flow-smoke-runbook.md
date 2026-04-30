@@ -7,7 +7,7 @@ Use this after Discord channel changes, Hermes upgrades, model swaps, or Minx MC
 - Minx MCP stack is running:
 
 ```bash
-~/Documents/minx-mcp/scripts/start_hermes_stack.sh
+/path/to/minx/scripts/start_hermes_stack.sh
 ```
 
 - Hermes config passes the Minx channel check:
@@ -30,7 +30,7 @@ python3 scripts/minx_flow_config.py --check --config ~/.hermes/config.yaml
 
 ## Smoke Checklist
 
-Run these in order. Record the date, model, Hermes commit, and Minx MCP commit in `#minx-ops`.
+Run these in order. Record the date, configured model, Hermes commit, minx-hermes commit, and Minx MCP commit in `#minx-ops`.
 
 1. Post a low-risk free-response prompt in `#ask-minx`.
    - Expected: Hermes responds in-channel without requiring a slash command.
@@ -83,3 +83,13 @@ Run these in order. Record the date, model, Hermes commit, and Minx MCP commit i
 - Check whether the Minx MCP ports `8000-8003` are listening.
 - Use `./scripts/smoke-investigations.sh --history` to find the newest terminal error.
 - Keep failure notes in `#minx-ops` and link the relevant Obsidian note under `Minx/Ops/Smoke Tests`.
+
+## Model Notes
+
+Use the deployment model configured for Hermes. For CLI smokes, set:
+
+```bash
+export MINX_INVESTIGATION_MODEL=google/gemini-2.5-flash
+```
+
+This is a recommended example, not a hard architectural dependency. Any OpenAI-compatible model endpoint must pass this smoke checklist before being trusted with real data.

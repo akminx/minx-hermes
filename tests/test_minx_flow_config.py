@@ -82,7 +82,7 @@ def test_normalize_channel_prompts_match_new_flow() -> None:
 def test_validate_reports_missing_minx_ops_as_warning() -> None:
     flow = load_flow_config()
     config = {
-        "skills": {"external_dirs": ["/Users/akmini/Documents/minx-hermes/skills"]},
+        "skills": {"external_dirs": [flow.DEFAULT_SKILLS_DIR]},
         "provider_routing": {"data_collection": "deny"},
         "discord": {
             "channel_directory": {

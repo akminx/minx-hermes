@@ -209,7 +209,7 @@ def test_replay_budget_exhaustion_blocks_extra_model_tool_calls_cleanly() -> Non
     adapter = ReplayAdapter(
         [
             _assistant_tool_turn("call-1", "memory_search", {"query": "one"}),
-            _assistant_tool_turn("call-2", "finance_query", {"q": "two"}),
+            _assistant_tool_turn("call-2", "finance_query", {"message": "two"}),
             _assistant_tool_turn("call-3", "memory_search", {"query": "three"}),
         ]
     )
@@ -233,7 +233,7 @@ def test_replay_budget_exhaustion_blocks_extra_model_tool_calls_cleanly() -> Non
     assert "max_tool_calls=2" in (result.error_message or "")
     assert dispatcher.calls == [
         ("memory_search", {"query": "one"}),
-        ("finance_query", {"q": "two"}),
+        ("finance_query", {"message": "two"}),
     ]
     assert len(core.steps) == 2
     assert core.completed == [

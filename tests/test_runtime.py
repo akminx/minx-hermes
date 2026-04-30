@@ -66,7 +66,7 @@ def test_succeeds_after_two_tool_calls() -> None:
     policy = ScriptedPolicy(
         [
             PolicyDecision(tool_call=("memory_search", {"query": "x"})),
-            PolicyDecision(tool_call=("finance_query", {"q": "y"})),
+            PolicyDecision(tool_call=("finance_query", {"message": "y"})),
             PolicyDecision(
                 final_answer=FinalAnswer(
                     answer_md="done",

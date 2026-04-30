@@ -18,6 +18,7 @@ LEGACY_CHANNEL_KEYS = {
     "health": "training",
     "journal": "capture",
 }
+DEFAULT_SKILLS_DIR = str((Path(__file__).resolve().parent.parent / "skills").resolve())
 
 CHANNEL_PROMPTS = {
     "ask_minx": (
@@ -32,7 +33,7 @@ CHANNEL_PROMPTS = {
         "treat it as an import request by default and use the minx/finance-import skill. "
         "Supported one-step imports are Robinhood CSV, Discover PDF, and DCU CSV/PDF. "
         "Prefer cached local attachment paths from Discord, stage them under "
-        "~/.minx/data/imports/discord/YYYY-MM-DD/, always run finance_import_preview "
+        "MINX_STAGING_PATH (default ~/.minx/staging), always run finance_import_preview "
         "before finance_import, and import only when account/source kind are clear. "
         "Ask one short clarification question instead of guessing."
     ),
@@ -152,8 +153,8 @@ def validate_minx_flow_config(config: dict[str, Any]) -> ValidationIssues:
             warnings.append(f"discord.channel_directory.{key} is not configured")
 
     external_dirs = _mapping(config.get("skills")).get("external_dirs")
-    if "/Users/akmini/Documents/minx-hermes/skills" not in (external_dirs or []):
-        errors.append("skills.external_dirs must include /Users/akmini/Documents/minx-hermes/skills")
+    if DEFAULT_SKILLS_DIR not in (external_dirs or []):
+        errors.append(f"skills.external_dirs must include {DEFAULT_SKILLS_DIR}")
 
     provider_routing = _mapping(config.get("provider_routing"))
     if provider_routing.get("data_collection") != "deny":

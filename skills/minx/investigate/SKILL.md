@@ -21,7 +21,7 @@ This skill owns the first Slice 9 interactive surface: `minx_investigate(questio
 2. Run a bounded read-only investigation loop.
 3. After each domain tool call, compute digest-only step metadata and call `minx_core.append_investigation_step(investigation_id, step_json=<digest step>)`.
 4. On success, call `minx_core.complete_investigation(..., status='succeeded', answer_md=<Hermes-authored answer>, citation_refs=<typed refs>, ...)`.
-5. On budget exhaustion, call `complete_investigation(..., status='budget_exhausted', answer_md=<partial answer>, ...)`.
+5. On budget exhaustion, call `complete_investigation(..., status='budget_exhausted', answer_md=<partial answer if available>, ...)`.
 6. On any unrecoverable tool or reasoning error after start, call `complete_investigation(..., status='failed', error_message=<short error>)` before responding.
 
 Never leave an investigation in `running` status if Hermes regains control after an error.
@@ -34,18 +34,18 @@ Default caps unless the user explicitly narrows them:
 - `wall_clock_s`: 120 seconds
 - `max_output_review`: inspect summaries and counts, not full raw rows, when a tool returns large data
 
-Stop early when the answer is clear. If a cap is hit, produce the best partial answer and mark the run `budget_exhausted`.
+Stop early when the answer is clear. If a cap is hit, produce the best partial answer if possible and mark the run `budget_exhausted`.
 
 ## Tool Allowlist
 
-Use the concrete catalog in `docs/minx-investigation-tool-catalog.md`.
+Use the concrete allowlist in `hermes_loop/runtime.py`; `docs/minx-investigation-tool-catalog.md` documents the same shipped policy.
 
 Default read tools:
 
-- Core: `get_daily_snapshot`, `get_insight_history`, `get_goal_trajectory`, `goal_list`, `goal_get`, `memory_list`, `memory_get`, `memory_search`, `memory_hybrid_search`, `memory_edge_list`, `investigation_history`, `investigation_get`
-- Finance: `safe_finance_summary`, `safe_finance_accounts`, `finance_query`, `finance_anomalies`, `finance_monitoring`, `finance_job_status`
-- Meals: `pantry_list`, `recommend_recipes`, `nutrition_profile_get`, `recipe_template`
-- Training: `training_exercise_list`, `training_program_get`, `training_session_list`, `training_progress_summary`
+- Core: `get_daily_snapshot`, `goal_list`, `goal_get`, `get_goal_trajectory`, `memory_list`, `memory_get`, `memory_search`, `memory_hybrid_search`, `memory_edge_list`, `investigation_history`, `investigation_get`
+- Finance: `safe_finance_summary`, `safe_finance_accounts`, `finance_query`
+- Meals: `pantry_list`, `recommend_recipes`, `nutrition_profile_get`
+- Training: `training_exercise_list`, `training_session_list`, `training_progress_summary`
 
 Do not call destructive or confirming tools (`memory_confirm`, `memory_reject`, vault writes, imports, or mutation tools) during an investigation unless the user explicitly asked for that action. If a risky mutation looks useful, append a step with `event_template='investigation.needs_confirmation'`, ask the user, and stop the investigation loop until they decide.
 
@@ -103,12 +103,13 @@ Invoke the production runner:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-... \
+MINX_INVESTIGATION_MODEL=google/gemini-2.5-flash \
 uv run scripts/minx-investigate.py --kind investigate \
   --question "why did dining spend rise last month?" \
   --max-tool-calls 8 --wall-clock-s 90
 ```
 
-The runner stitches together the budget-enforced agentic loop, the OpenAI tool-calling policy on OpenRouter (`nvidia/nemotron-3-super-120b-a12b`, no-logging providers only), an MCP fan-out dispatcher to Core/Finance/Meals/Training, and Core's `start_investigation` / `append_investigation_step` / `complete_investigation` surfaces. Output is a JSON result with `investigation_id`, `status`, `answer_md`, `citation_refs`, `tool_call_count`, and `elapsed_s`.
+The runner stitches together the budget-enforced agentic loop, an OpenAI-compatible tool-calling policy, an MCP fan-out dispatcher to Core/Finance/Meals/Training, and Core's `start_investigation` / `append_investigation_step` / `complete_investigation` surfaces. Output is a JSON result with `investigation_id`, `status`, `answer_md`, `citation_refs`, `tool_call_count`, and `elapsed_s`.
 
 Use `--print-config` to dump the resolved config without making LLM/MCP calls.
 
@@ -130,7 +131,7 @@ not the preferred route for personal data.
 The live Hermes implementation follows `docs/hermes-investigation-runtime-contract.md`. Reference implementations in this repo:
 
 - `hermes_loop/runtime.py` — agentic loop with hard budget enforcement (`max_tool_calls`, wall-clock), a programmatic tool allowlist, terminal-status guarantee, and pluggable Policy/Dispatcher/Core seams.
-- `hermes_loop/policies.py:OpenAIToolCallingPolicy` — drives any OpenAI-compatible tool-calling chat endpoint (Nemotron-3-Super on OpenRouter is the default).
-- `hermes_loop/mcp_clients.py` — `MCPToolDispatcher` and `MCPCoreClient` over `mcp.client.streamable_http`.
+- `hermes_loop/policies.py:OpenAIToolCallingPolicy` — drives any OpenAI-compatible tool-calling chat endpoint.
+- `hermes_loop/mcp_clients.py` — `MCPToolDispatcher` and `MCPCoreClient` over `mcp.client.streamablehttp_client`.
 - `scripts/minx-investigate.py` — production runner that ties them all together.
 - `scripts/minx-investigate-once.py` — deterministic mode-driven smoke runner that predates the agentic loop and is kept for `scripts/smoke-investigations.sh`.

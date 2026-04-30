@@ -1,5 +1,7 @@
 # Hermes Infrastructure — Claudeification Plan
 
+> Historical plan: this targets an earlier upstream Hermes layout and is not a description of shipped `minx-hermes` behavior. Use `../../README.md` and `../hermes-investigation-runtime-contract.md` for current architecture.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Hermes structurally reliable by adopting Claude Code's core patterns: validate before exposing, type your contracts, declare dependencies, route models by task, and activate the delegation/clarify/todo tools that already exist but aren't being used.

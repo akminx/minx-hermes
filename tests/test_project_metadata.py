@@ -19,7 +19,6 @@ def test_pyproject_declares_runtime_dependencies() -> None:
     assert project["requires-python"] == ">=3.12"
     assert "httpx>=0.27.0" in dependencies
     assert "mcp[cli]>=1.13.0" in dependencies
-    assert "minx-mcp @ file:///Users/akmini/Documents/minx-mcp" in dependencies
     assert "PyYAML>=6.0.0" in dependencies
 
 

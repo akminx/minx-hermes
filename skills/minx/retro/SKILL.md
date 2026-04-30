@@ -19,7 +19,7 @@ Answer retrospective questions like "what changed this week?" or "why did that p
 2. Read the relevant finance, training, meals, goal, memory, and prior-investigation context.
 3. Append one digest-only investigation step after each domain tool call.
 4. Complete with `status='succeeded'`, a Hermes-authored retrospective, and typed citations.
-5. Complete as `budget_exhausted` for partial retrospectives when caps are hit.
+5. Complete as `budget_exhausted` when caps are hit, with a partial retrospective if one is available.
 6. Complete as `failed` after any unrecoverable error that happens after start.
 
 Never persist raw tool output in Core investigation fields.
@@ -28,14 +28,14 @@ Never persist raw tool output in Core investigation fields.
 
 - `max_tool_calls`: 12 total MCP tool calls after `start_investigation`
 - `wall_clock_s`: 120 seconds
-- `max_steps`: 12 appended trajectory steps
+- Appended trajectory steps are bounded by `max_tool_calls`; there is no separate step cap.
 
 ## Tool Policy
 
-Use read tools from `docs/minx-investigation-tool-catalog.md`. Prefer:
+Use read tools from the runtime allowlist documented in `docs/minx-investigation-tool-catalog.md`. Prefer:
 
-- Core: `get_daily_snapshot`, `get_insight_history`, `goal_list`, `get_goal_trajectory`, `memory_list(include_cited_investigations=true)`, `memory_search`, `investigation_history`, `investigation_get`
-- Finance: `safe_finance_summary`, `finance_query`, `finance_anomalies`, `finance_monitoring`
+- Core: `get_daily_snapshot`, `goal_list`, `goal_get`, `get_goal_trajectory`, `memory_list(include_cited_investigations=true)`, `memory_search`, `investigation_history`, `investigation_get`
+- Finance: `safe_finance_summary`, `safe_finance_accounts`, `finance_query`
 - Meals: `nutrition_profile_get`, `pantry_list`
 - Training: `training_progress_summary`, `training_session_list`
 
@@ -62,4 +62,4 @@ uv run scripts/minx-investigate.py --kind retro \
   --max-tool-calls 10 --wall-clock-s 90
 ```
 
-Same agentic loop as `/minx-investigate`; only the `kind` differs. Hermes config in `~/.hermes/config.yaml` already routes the four Minx MCP servers; the runner drives Nemotron-3-Super on OpenRouter with no-logging routing and prints a JSON result.
+Same agentic loop as `/minx-investigate`; only the `kind` differs. The runner resolves MCP endpoints from CLI flags or `MINX_*_URL` environment variables, drives the configured OpenAI-compatible model endpoint, and prints a JSON result. Use `MINX_INVESTIGATION_MODEL=google/gemini-2.5-flash` as the recommended OpenRouter example unless deployment config says otherwise.

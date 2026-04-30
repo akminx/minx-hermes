@@ -32,6 +32,7 @@ def test_parse_args_honors_investigation_routing_environment(
         ["minx-investigate.py", "--question", "hello"],
     )
     monkeypatch.setenv("MINX_INVESTIGATION_MODEL", "openrouter/free")
+    monkeypatch.setenv("MINX_INVESTIGATION_BASE_URL", "https://llm.example/v1")
     monkeypatch.setenv("MINX_INVESTIGATION_DATA_COLLECTION", "allow")
     monkeypatch.setenv("MINX_INVESTIGATION_REASONING_EFFORT", "off")
     monkeypatch.setenv("MINX_INVESTIGATION_QUANTIZATIONS", "")
@@ -40,13 +41,14 @@ def test_parse_args_honors_investigation_routing_environment(
     args = runner.parse_args()
 
     assert args.model == "openrouter/free"
+    assert args.base_url == "https://llm.example/v1"
     assert args.data_collection == "allow"
     assert args.reasoning_effort == "off"
     assert args.quantizations == ""
     assert args.api_key_env == "OPENROUTER_API_KEY"
 
 
-def test_parse_args_keeps_private_paid_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parse_args_keeps_configured_private_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = load_runner()
     monkeypatch.setattr(
         sys,
@@ -67,7 +69,7 @@ def test_parse_args_keeps_private_paid_defaults(monkeypatch: pytest.MonkeyPatch)
     assert args.model == runner.DEFAULT_MODEL
     assert args.data_collection == "deny"
     assert args.reasoning_effort == "medium"
-    assert args.quantizations == "fp8,bf16"
+    assert args.quantizations == ""
     assert args.api_key_env == "OPENROUTER_API_KEY"
 
 

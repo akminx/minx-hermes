@@ -1,5 +1,7 @@
 # Slice 8 Handoff — Proactive Autonomy
 
+> Historical handoff: this records the April 2026 Slice 8 state and should not be used as current architecture or operations guidance. Current behavior lives in `../README.md`, `hermes-investigation-runtime-contract.md`, `minx-investigation-tool-catalog.md`, and `discord-flow-smoke-runbook.md`.
+
 **Date**: 2026-04-22
 
 ## Summary

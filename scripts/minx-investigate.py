@@ -12,11 +12,12 @@ Drives the Hermes investigation loop end-to-end with:
 
 This is the actual command behind the live `/minx-investigate`,
 `/minx-plan`, `/minx-retro`, and `/minx-onboard-entity` slash commands.
-Hermes config in `~/.hermes/config.yaml` already points at the four MCP
-servers; this script just stitches them together for the agentic loop.
+Endpoint flags or `MINX_*_URL` environment variables point at the four MCP
+servers; this script stitches them together for the agentic loop.
 
 Usage:
     OPENROUTER_API_KEY=sk-or-v1-... \
+    MINX_INVESTIGATION_MODEL=google/gemini-2.5-flash \
     uv run scripts/minx-investigate.py \
       --kind investigate \
       --question "why did dining spend rise last month?" \
@@ -30,11 +31,11 @@ Usage:
 
 Environment variables consumed:
     OPENROUTER_API_KEY (required for live LLM calls)
-    MINX_INVESTIGATION_MODEL, MINX_INVESTIGATION_DATA_COLLECTION,
-    MINX_INVESTIGATION_REASONING_EFFORT, MINX_INVESTIGATION_QUANTIZATIONS,
-    MINX_INVESTIGATION_API_KEY_ENV
+    MINX_INVESTIGATION_MODEL, MINX_INVESTIGATION_BASE_URL,
+    MINX_INVESTIGATION_DATA_COLLECTION, MINX_INVESTIGATION_REASONING_EFFORT,
+    MINX_INVESTIGATION_QUANTIZATIONS, MINX_INVESTIGATION_API_KEY_ENV
     MINX_CORE_URL, MINX_FINANCE_URL, MINX_MEALS_URL, MINX_TRAINING_URL
-        (override defaults from ~/.hermes/config.yaml)
+        (override default localhost MCP URLs)
 """
 
 from __future__ import annotations
@@ -49,10 +50,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-# Allow running against an editable minx-mcp checkout for local dev.
-_MINX_MCP_DEV = Path("/Users/akmini/Documents/minx-mcp")
-if _MINX_MCP_DEV.exists() and str(_MINX_MCP_DEV) not in sys.path:
-    sys.path.insert(0, str(_MINX_MCP_DEV))
+# Allow running against an editable minx checkout for local dev. This is
+# intentionally opt-in so the script is portable across machines.
+_MINX_MCP_DEV = os.environ.get("MINX_MCP_CHECKOUT")
+_MINX_MCP_DEV_PATH = Path(_MINX_MCP_DEV).expanduser() if _MINX_MCP_DEV else None
+if (
+    _MINX_MCP_DEV_PATH
+    and _MINX_MCP_DEV_PATH.exists()
+    and str(_MINX_MCP_DEV_PATH) not in sys.path
+):
+    sys.path.insert(0, str(_MINX_MCP_DEV_PATH))
 
 from hermes_loop import (  # noqa: E402
     Budget,
@@ -66,7 +73,7 @@ from hermes_loop.mcp_clients import (  # noqa: E402
 )
 
 
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+DEFAULT_MODEL = "google/gemini-2.5-flash"
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,7 +114,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--quantizations",
-        default=os.environ.get("MINX_INVESTIGATION_QUANTIZATIONS", "fp8,bf16"),
+        default=os.environ.get("MINX_INVESTIGATION_QUANTIZATIONS", ""),
     )
     parser.add_argument(
         "--core-url",

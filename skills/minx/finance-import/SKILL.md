@@ -1,6 +1,6 @@
 ---
 name: finance-import
-description: Deterministic import flow for Robinhood, Discover, and DCU statements uploaded in #finances.
+description: Deterministic import flow for Robinhood, Discover, and DCU statements uploaded in the finance lane.
 version: 4.0.0
 author: Minx
 metadata:
@@ -12,14 +12,16 @@ metadata:
 
 Import supported finance statement files into Minx through `minx_finance` tools.
 
-This skill is the canonical path for Discord uploads in `#finances`. When the
+This skill is the canonical path for Discord uploads in the finance lane. The
+current logical lane is `#finance`; older deployments may still route `#finances`
+as a legacy alias. When the
 message contains a supported attachment, default to import behavior instead of
 making the user spell out the workflow.
 
 ## One-Step Discord Contract
 
 If all of the following are true:
-- the message is in `#finances`
+- the message is in `#finance` or a configured legacy `#finances` alias
 - there is at least one supported attachment (`.csv` or `.pdf`)
 - the user did not explicitly say *not* to import
 
@@ -42,7 +44,7 @@ clarification.
 
 1. Always call `minx_finance.finance_import_preview` before final import.
 2. Never use legacy scripts (`finance_import.py`) or disabled legacy MCPs.
-3. Minx import only accepts files under Minx import root. Stage files under `~/.minx/data/imports/` first.
+3. Minx import only accepts files under the configured staging root. Stage files under `MINX_STAGING_PATH` (default `~/.minx/staging`) first.
 4. Keep raw files out of the vault.
 5. If the account or format is ambiguous, ask one short clarification instead of guessing.
 6. If the message has no supported attachment, do not force an import. Answer normally or ask what file/account the user wants to import.
@@ -97,7 +99,7 @@ clarification like:
 
 For each file, stage it under:
 
-`~/.minx/data/imports/discord/YYYY-MM-DD/<original-name>`
+`~/.minx/staging/discord/YYYY-MM-DD/<original-name>`
 
 Use the staged absolute path as `source_ref`.
 
@@ -125,8 +127,8 @@ If the returned status is not already terminal, poll:
 ### 6) Optional checks
 
 If the import inserted new rows, you may follow with:
-- `minx_finance.finance_monitoring(period_start, period_end)`
-- `minx_finance.finance_anomalies()`
+- `minx_finance.safe_finance_summary()`
+- `minx_finance.finance_query(...)` for a narrow read-only sanity check
 
 Keep this lightweight. The primary job is successful import.
 

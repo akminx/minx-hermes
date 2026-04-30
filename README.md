@@ -1,19 +1,23 @@
 # minx-hermes
 
-Personal version-controlled overlay for the Minx integration artifacts that
-live inside the Hermes harness runtime (`~/.hermes/`). This repo captures the
-bits of Minx that have to sit under the Hermes directory structure but that
-don't belong in either of the upstream repos.
+`minx-hermes` is the harness-side overlay for Minx: skills, smoke scripts,
+cron snapshots, and the budgeted investigation runner that lets Hermes talk to
+the Minx MCP servers without mixing harness concerns into the backend repo.
+
+The companion backend repo is [akminx/minx](https://github.com/akminx/minx).
+`minx` owns durable facts and deterministic logic. `minx-hermes` owns how an
+agent chooses tools, asks the model for the next step, enforces budgets, and
+turns structured facts into user-facing prose.
 
 ## Relationship to other repos
 
 | Repo | Location | Remote | Role |
 |---|---|---|---|
-| **minx-mcp** | `~/Documents/minx-mcp` | `akminx/minx` | The Python MCP servers (minx-core, minx-finance, etc.). The server code that Hermes connects to. |
+| **minx** | your `minx` checkout | `akminx/minx` | The Python MCP servers (minx-core, minx-finance, etc.). The server code that Hermes connects to. |
 | **hermes-agent** | `~/.hermes/hermes-agent` | `NousResearch/hermes-agent` (upstream, read-only for us) | The Hermes harness itself. We do NOT push Minx-specific files here. |
-| **minx-hermes** (this repo) | `~/Documents/minx-hermes` | local only | Minx playbook skills, smoke/ops scripts, cron snapshots, and handoff docs that must live under `~/.hermes/` at runtime. |
+| **minx-hermes** (this repo) | your `minx-hermes` checkout | `akminx/minx-hermes` | Minx playbook skills, smoke/ops scripts, cron snapshots, investigation runner, and operational docs. |
 
-Separating this from `minx-mcp` keeps harness-framework concerns out of the
+Separating this from `minx` keeps harness-framework concerns out of the
 MCP server repo. Separating it from `hermes-agent` keeps our personal Minx
 skills and scripts out of the NousResearch upstream (which we never push to).
 
@@ -32,7 +36,7 @@ skills/minx/              Minx playbook skills, symlinked into ~/.hermes/skills/
   goal-nudge/SKILL.md
   weekly-review/SKILL.md
 scripts/
-  configure-finance-import-flow.sh  Bind #finances to the finance-import skill and sync the live symlink
+  configure-finance-import-flow.sh  Bind finance lane import flow and sync the live symlink
   smoke-playbooks.sh      Queue a playbook and wait for terminal audit status
   smoke-investigations.sh Wrap a Hermes investigation command and wait for terminal audit status
   snapshot-cron-jobs.sh   Snapshot the 5 playbooks plus reconcile sweep from ~/.hermes/cron/jobs.json
@@ -41,15 +45,15 @@ cron/
 docs/
   plans/                  Hermes infra plans
   discord-flow-smoke-runbook.md  Discord lane and investigation smoke checklist
-  slice8-handoff.md       Handoff for future Claude sessions
+  slice8-handoff.md       Historical Slice 8 handoff
 ```
 
 ### Symlink contract
 
 Each `skills/minx/<name>/` in this repo is symlinked from
 `~/.hermes/skills/minx/<name>/`. Hermes loads skills from that path; the repo
-owns the source of truth. Re-cloning on a new machine: clone this repo to
-`~/Documents/minx-hermes`, then `ln -s ~/Documents/minx-hermes/skills/minx/<name> ~/.hermes/skills/minx/<name>` for each playbook.
+owns the source of truth. Re-cloning on a new machine: clone this repo, then
+symlink each `skills/minx/<name>` directory into `~/.hermes/skills/minx/<name>`.
 
 Latest Hermes derives slash commands from SKILL frontmatter names. The Slice 9
 interactive surfaces are:
@@ -60,6 +64,39 @@ interactive surfaces are:
 - `/minx-onboard-entity` with `/minx_onboard_entity` alias
 
 ## Common tasks
+
+Start the Minx MCP stack from the backend checkout:
+
+```
+/path/to/minx/scripts/start_hermes_stack.sh
+```
+
+For local development, install the backend checkout into this environment or
+point the runner at it:
+
+```
+uv pip install -e /path/to/minx
+# or
+export MINX_MCP_CHECKOUT=/path/to/minx
+```
+
+Run a live investigation with the recommended example model:
+
+```
+export OPENROUTER_API_KEY=sk-or-v1-...
+export MINX_INVESTIGATION_MODEL=google/gemini-2.5-flash
+export MINX_INVESTIGATION_BASE_URL=https://openrouter.ai/api/v1
+uv run scripts/minx-investigate.py --kind investigate \
+  --question "what changed in my spending last month?" \
+  --max-tool-calls 8 --wall-clock-s 90
+```
+
+The model id is configuration. The runtime works through an OpenAI-compatible
+endpoint and should be smoke-tested whenever the model changes.
+Use `MINX_CORE_URL`, `MINX_FINANCE_URL`, `MINX_MEALS_URL`, and
+`MINX_TRAINING_URL` to point the runner at non-default MCP endpoints. Smoke
+scripts read `MINX_DB` when your SQLite database is not at
+`~/.minx/data/minx.db`.
 
 Refresh the cron snapshot after editing a playbook schedule:
 
@@ -103,7 +140,7 @@ runs the supplied command without `eval`, then waits for a new terminal
 Smoke-test a deterministic investigation:
 
 ```
-~/Documents/minx-mcp/scripts/start_hermes_stack.sh
+/path/to/minx/scripts/start_hermes_stack.sh
 ./scripts/smoke-investigations.sh -- \
   python3 scripts/minx-investigate-once.py \
     --question "Summarize my current finance state" \
@@ -111,7 +148,7 @@ Smoke-test a deterministic investigation:
 ```
 
 Both scripts assume the Minx MCP stack is up (ports 8000-8003); start it with
-`~/Documents/minx-mcp/scripts/start_hermes_stack.sh`.
+`/path/to/minx/scripts/start_hermes_stack.sh`.
 
 After Discord channel, Hermes, or model changes, run the full lane checklist in
 `docs/discord-flow-smoke-runbook.md`.

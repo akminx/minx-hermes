@@ -71,14 +71,13 @@ DEFAULT_TOOL_ALLOWLIST = frozenset(
         "investigation_history",
         "investigation_get",
         "get_daily_snapshot",
-        "list_goals",
-        "goal_progress_summary",
+        "goal_list",
+        "goal_get",
+        "get_goal_trajectory",
         # Finance read tools
         "finance_query",
         "safe_finance_summary",
-        "list_accounts",
-        "list_categories",
-        "list_merchants",
+        "safe_finance_accounts",
         # Meals read tools
         "pantry_list",
         "recommend_recipes",

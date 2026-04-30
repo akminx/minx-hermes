@@ -42,7 +42,7 @@ def stub_calls(monkeypatch: pytest.MonkeyPatch):
 def test_dispatcher_routes_to_correct_server(stub_calls) -> None:
     dispatcher = MCPToolDispatcher()
     dispatcher("memory_search", {"query": "x"})
-    dispatcher("finance_query", {"query": "dining last month"})
+    dispatcher("finance_query", {"message": "dining last month"})
     dispatcher("pantry_list", {})
     dispatcher("training_session_list", {})
 
@@ -75,6 +75,22 @@ def test_routing_covers_default_allowlist() -> None:
 
     missing = DEFAULT_TOOL_ALLOWLIST - _TOOL_ROUTING.keys()
     assert missing == set(), f"missing route for: {sorted(missing)}"
+
+
+def test_routing_uses_current_minx_tool_names() -> None:
+    stale_names = {
+        "list_goals",
+        "goal_progress_summary",
+        "list_accounts",
+        "list_categories",
+        "list_merchants",
+    }
+
+    assert stale_names.isdisjoint(_TOOL_ROUTING)
+    assert _TOOL_ROUTING["goal_list"] == "core"
+    assert _TOOL_ROUTING["goal_get"] == "core"
+    assert _TOOL_ROUTING["get_goal_trajectory"] == "core"
+    assert _TOOL_ROUTING["safe_finance_accounts"] == "finance"
 
 
 def test_core_client_start_investigation_returns_id(stub_calls) -> None:

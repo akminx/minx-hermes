@@ -9,7 +9,8 @@ Each entry is the OpenAI tool object format:
     {"type": "function", "function": {"name", "description", "parameters"}}
 
 Schemas are intentionally permissive on optional integer/limit fields so
-Nemotron-3-Super doesn't fail strict JSON validation when it omits them.
+OpenAI-compatible providers do not fail strict JSON validation when they omit
+optional arguments.
 """
 
 from __future__ import annotations
@@ -101,7 +102,10 @@ _INVESTIGATION_HISTORY = _fn(
     {
         "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25},
         "kind": {"type": "string"},
+        "harness": {"type": "string"},
         "status": {"type": "string"},
+        "since": {"type": "string", "description": "Optional ISO timestamp lower bound."},
+        "days": {"type": "integer", "minimum": 1, "maximum": 365},
     },
     [],
 )
@@ -126,20 +130,31 @@ _GET_DAILY_SNAPSHOT = _fn(
     [],
 )
 
-_LIST_GOALS = _fn(
-    "list_goals",
+_GOAL_LIST = _fn(
+    "goal_list",
     "List goals with optional status filter.",
-    {
-        "status": {"type": "string"},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
-    },
+    {"status": {"type": "string"}},
     [],
 )
 
-_GOAL_PROGRESS_SUMMARY = _fn(
-    "goal_progress_summary",
-    "Get progress for a single goal — current period actuals vs target, drift, and status.",
-    {"goal_id": {"type": "integer", "minimum": 1}},
+_GOAL_GET = _fn(
+    "goal_get",
+    "Fetch one goal plus current progress for the requested review date.",
+    {
+        "goal_id": {"type": "integer", "minimum": 1},
+        "review_date": {"type": "string", "description": "ISO date YYYY-MM-DD. Defaults to today."},
+    },
+    ["goal_id"],
+)
+
+_GET_GOAL_TRAJECTORY = _fn(
+    "get_goal_trajectory",
+    "Fetch recent trajectory periods for a goal.",
+    {
+        "goal_id": {"type": "integer", "minimum": 1},
+        "periods": {"type": "integer", "minimum": 1, "maximum": 24, "default": 4},
+        "as_of_date": {"type": "string", "description": "ISO date YYYY-MM-DD. Defaults to today."},
+    },
     ["goal_id"],
 )
 
@@ -148,10 +163,15 @@ _FINANCE_QUERY = _fn(
     "finance_query",
     "Run a structured natural-language finance query. Returns rows aggregated by the inferred filters.",
     {
-        "query": {"type": "string", "description": "Plain-language finance question."},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+        "message": {"type": "string", "description": "Plain-language finance question."},
+        "natural_query": {"type": "string", "description": "Alias for message."},
+        "review_date": {"type": "string", "description": "ISO date YYYY-MM-DD. Defaults to today."},
+        "session_ref": {"type": "string"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 50},
+        "intent": {"type": "string", "description": "Structured intent such as list_transactions."},
+        "filters": {"type": "object", "additionalProperties": True},
     },
-    ["query"],
+    [],
 )
 
 _SAFE_FINANCE_SUMMARY = _fn(
@@ -161,24 +181,10 @@ _SAFE_FINANCE_SUMMARY = _fn(
     [],
 )
 
-_LIST_ACCOUNTS = _fn(
-    "list_accounts",
-    "List finance accounts.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
-    [],
-)
-
-_LIST_CATEGORIES = _fn(
-    "list_categories",
-    "List spending categories.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
-    [],
-)
-
-_LIST_MERCHANTS = _fn(
-    "list_merchants",
-    "List merchants.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
+_SAFE_FINANCE_ACCOUNTS = _fn(
+    "safe_finance_accounts",
+    "List finance accounts through the safe finance read surface.",
+    {},
     [],
 )
 
@@ -186,14 +192,17 @@ _LIST_MERCHANTS = _fn(
 _PANTRY_LIST = _fn(
     "pantry_list",
     "List pantry items.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
+    {},
     [],
 )
 
 _RECOMMEND_RECIPES = _fn(
     "recommend_recipes",
     "Recommend recipes given current pantry and nutrition profile.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}},
+    {
+        "include_needs_shopping": {"type": "boolean", "default": False},
+        "apply_nutrition_filter": {"type": "boolean", "default": False},
+    },
     [],
 )
 
@@ -208,21 +217,28 @@ _NUTRITION_PROFILE_GET = _fn(
 _TRAINING_EXERCISE_LIST = _fn(
     "training_exercise_list",
     "List training exercises.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 100}},
+    {},
     [],
 )
 
 _TRAINING_SESSION_LIST = _fn(
     "training_session_list",
     "List recent training sessions.",
-    {"limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}},
+    {
+        "start_date": {"type": "string", "description": "ISO date YYYY-MM-DD."},
+        "end_date": {"type": "string", "description": "ISO date YYYY-MM-DD."},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 50},
+    },
     [],
 )
 
 _TRAINING_PROGRESS_SUMMARY = _fn(
     "training_progress_summary",
     "Summary of training progress over recent weeks.",
-    {},
+    {
+        "as_of": {"type": "string", "description": "ISO date YYYY-MM-DD. Defaults to today."},
+        "lookback_days": {"type": "integer", "minimum": 1, "maximum": 365, "default": 7},
+    },
     [],
 )
 
@@ -238,13 +254,12 @@ _BY_NAME: dict[str, dict[str, Any]] = {
         _INVESTIGATION_HISTORY,
         _INVESTIGATION_GET,
         _GET_DAILY_SNAPSHOT,
-        _LIST_GOALS,
-        _GOAL_PROGRESS_SUMMARY,
+        _GOAL_LIST,
+        _GOAL_GET,
+        _GET_GOAL_TRAJECTORY,
         _FINANCE_QUERY,
         _SAFE_FINANCE_SUMMARY,
-        _LIST_ACCOUNTS,
-        _LIST_CATEGORIES,
-        _LIST_MERCHANTS,
+        _SAFE_FINANCE_ACCOUNTS,
         _PANTRY_LIST,
         _RECOMMEND_RECIPES,
         _NUTRITION_PROFILE_GET,

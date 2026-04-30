@@ -74,6 +74,40 @@ def test_known_tool_names_covers_default_allowlist_subset() -> None:
     assert missing == set(), f"missing schemas for: {sorted(missing)}"
 
 
+def test_tool_catalog_uses_current_minx_tool_names() -> None:
+    from hermes_loop.runtime import DEFAULT_TOOL_ALLOWLIST
+
+    stale_names = {
+        "list_goals",
+        "goal_progress_summary",
+        "list_accounts",
+        "list_categories",
+        "list_merchants",
+    }
+
+    assert stale_names.isdisjoint(DEFAULT_TOOL_ALLOWLIST)
+    assert stale_names.isdisjoint(known_tool_names())
+    assert {"goal_list", "goal_get", "get_goal_trajectory", "safe_finance_accounts"} <= known_tool_names()
+
+
+def test_tool_schemas_match_current_minx_arguments() -> None:
+    schemas = {schema["function"]["name"]: schema["function"]["parameters"] for schema in all_schemas()}
+
+    finance_query = schemas["finance_query"]["properties"]
+    assert "message" in finance_query
+    assert "natural_query" in finance_query
+    assert "query" not in finance_query
+
+    assert "harness" in schemas["investigation_history"]["properties"]
+    assert "since" in schemas["investigation_history"]["properties"]
+    assert "days" in schemas["investigation_history"]["properties"]
+    assert "review_date" in schemas["goal_get"]["properties"]
+    assert "periods" in schemas["get_goal_trajectory"]["properties"]
+    assert "include_needs_shopping" in schemas["recommend_recipes"]["properties"]
+    assert "start_date" in schemas["training_session_list"]["properties"]
+    assert "lookback_days" in schemas["training_progress_summary"]["properties"]
+
+
 def test_all_schemas_have_well_formed_function_objects() -> None:
     for schema in all_schemas():
         assert schema["type"] == "function"

@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
-# Make the local minx-mcp checkout importable for in-tree smoke runs.
-_MINX_MCP_CANDIDATE = Path("/Users/akmini/Documents/minx-mcp")
+# Make an optional local minx checkout importable for in-tree smoke runs.
+_MINX_MCP_CANDIDATE = Path.cwd().parent / "minx"
 if _MINX_MCP_CANDIDATE.exists() and str(_MINX_MCP_CANDIDATE) not in sys.path:
     sys.path.insert(0, str(_MINX_MCP_CANDIDATE))
 

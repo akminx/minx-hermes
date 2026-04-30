@@ -19,21 +19,21 @@ Create a compact entity dossier from existing Minx data. This is the Slice 9f `m
 2. Search memories, prior investigations, vault notes, and relevant domain summaries for the entity.
 3. Append digest-only investigation steps after each tool call.
 4. Complete with `status='succeeded'`, a Hermes-authored dossier, and typed citations.
-5. Complete as `budget_exhausted` if the run reaches caps.
+5. Complete as `budget_exhausted` if the run reaches caps, with a partial dossier if one is available.
 6. Complete as `failed` after any unrecoverable error that happens after start.
 
 ## Budget
 
 - `max_tool_calls`: 12 total MCP tool calls after `start_investigation`
 - `wall_clock_s`: 120 seconds
-- `max_steps`: 12 appended trajectory steps
+- Appended trajectory steps are bounded by `max_tool_calls`; there is no separate step cap.
 
 ## Tool Policy
 
-Use read tools from `docs/minx-investigation-tool-catalog.md`. Prefer:
+Use read tools from the runtime allowlist documented in `docs/minx-investigation-tool-catalog.md`. Prefer:
 
 - Core: `memory_search`, `memory_hybrid_search`, `memory_list(include_cited_investigations=true)`, `memory_get`, `memory_edge_list`, `investigation_history`, `investigation_get`, `get_daily_snapshot`
-- Finance: `finance_query`, `safe_finance_summary` for merchants or accounts
+- Finance: `finance_query`, `safe_finance_summary`, `safe_finance_accounts` for merchants or accounts
 - Meals: `pantry_list`, `recommend_recipes`, `nutrition_profile_get` for food entities
 - Training: `training_exercise_list`, `training_session_list`, `training_progress_summary` for training entities
 
