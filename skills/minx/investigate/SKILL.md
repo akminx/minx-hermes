@@ -97,9 +97,27 @@ Hermes authors `answer_md`; Core must not write the final prose. The response to
 - Budget exhausted: append the last observed step if possible, complete as `budget_exhausted`, and return the partial answer.
 - Confirmation needed: append `investigation.needs_confirmation`, ask the user, and do not mutate state until the user explicitly confirms.
 
+## Running
+
+Invoke the production runner:
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-... \
+uv run scripts/minx-investigate.py --kind investigate \
+  --question "why did dining spend rise last month?" \
+  --max-tool-calls 8 --wall-clock-s 90
+```
+
+The runner stitches together the budget-enforced agentic loop, the OpenAI tool-calling policy on OpenRouter (`nvidia/nemotron-3-super-120b-a12b`, no-logging providers only), an MCP fan-out dispatcher to Core/Finance/Meals/Training, and Core's `start_investigation` / `append_investigation_step` / `complete_investigation` surfaces. Output is a JSON result with `investigation_id`, `status`, `answer_md`, `citation_refs`, `tool_call_count`, and `elapsed_s`.
+
+Use `--print-config` to dump the resolved config without making LLM/MCP calls.
+
 ## Runtime Contract
 
-The live Hermes implementation must follow `docs/hermes-investigation-runtime-contract.md`. Two reference implementations live in this repo:
+The live Hermes implementation follows `docs/hermes-investigation-runtime-contract.md`. Reference implementations in this repo:
 
-- `hermes_loop/runtime.py` — agentic loop with hard budget enforcement (`max_tool_calls`, wall-clock), a programmatic tool allowlist, terminal-status guarantee, and pluggable Policy/Dispatcher/Core seams. Tested by `tests/test_runtime.py`. This is what production Hermes must adopt or reimplement.
-- `scripts/minx-investigate-once.py` — deterministic mode-driven runner used by smoke. Predates the agentic loop and is kept for the smoke harness.
+- `hermes_loop/runtime.py` — agentic loop with hard budget enforcement (`max_tool_calls`, wall-clock), a programmatic tool allowlist, terminal-status guarantee, and pluggable Policy/Dispatcher/Core seams.
+- `hermes_loop/policies.py:OpenAIToolCallingPolicy` — drives any OpenAI-compatible tool-calling chat endpoint (Nemotron-3-Super on OpenRouter is the default).
+- `hermes_loop/mcp_clients.py` — `MCPToolDispatcher` and `MCPCoreClient` over `mcp.client.streamable_http`.
+- `scripts/minx-investigate.py` — production runner that ties them all together.
+- `scripts/minx-investigate-once.py` — deterministic mode-driven smoke runner that predates the agentic loop and is kept for `scripts/smoke-investigations.sh`.

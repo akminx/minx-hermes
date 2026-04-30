@@ -51,3 +51,15 @@ Return:
 - What to carry forward or adjust next.
 
 Use citations for any durable memories, prior investigations, vault paths, and tool result digests.
+
+## Running
+
+Invoke the production runner with `kind=retro`:
+
+```bash
+uv run scripts/minx-investigate.py --kind retro \
+  --question "<the retro question>" \
+  --max-tool-calls 10 --wall-clock-s 90
+```
+
+Same agentic loop as `/minx-investigate`; only the `kind` differs. Hermes config in `~/.hermes/config.yaml` already routes the four Minx MCP servers; the runner drives Nemotron-3-Super on OpenRouter with no-logging routing and prints a JSON result.

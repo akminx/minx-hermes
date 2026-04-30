@@ -51,3 +51,15 @@ Return a concise plan with:
 - Typed citations for memories, prior investigations, vault paths, and tool result digests.
 
 Core stores lifecycle data; Hermes authors the plan prose.
+
+## Running
+
+Invoke the production runner with `kind=plan`:
+
+```bash
+uv run scripts/minx-investigate.py --kind plan \
+  --question "<the planning request>" \
+  --max-tool-calls 12 --wall-clock-s 120
+```
+
+The runner enforces budget caps, calls the Core/Finance/Meals/Training MCP servers configured in `~/.hermes/config.yaml`, drives `nvidia/nemotron-3-super-120b-a12b` on OpenRouter (no-logging providers only), and prints a JSON result with `investigation_id`, `status`, `answer_md`, and `citation_refs`.

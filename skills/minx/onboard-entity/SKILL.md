@@ -49,3 +49,16 @@ Return:
 - Suggested next action, if any.
 
 Use structured citations for memories, prior investigations, vault paths, and tool result digests. Core stores the audit; Hermes writes the dossier.
+
+## Running
+
+Invoke the production runner with `kind=onboard`:
+
+```bash
+uv run scripts/minx-investigate.py --kind onboard \
+  --question "<entity request>" \
+  --context-json '{"entity": "Sweetgreen", "entity_type": "merchant"}' \
+  --max-tool-calls 12 --wall-clock-s 120
+```
+
+Same agentic loop and budget enforcement as the other `/minx-*` surfaces; entity context goes in `--context-json`.
