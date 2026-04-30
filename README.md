@@ -24,6 +24,9 @@ skills/minx/              Minx playbook skills, symlinked into ~/.hermes/skills/
   daily-review/SKILL.md
   finance-import/SKILL.md
   investigate/SKILL.md
+  plan/SKILL.md
+  retro/SKILL.md
+  onboard-entity/SKILL.md
   wiki-update/SKILL.md
   memory-review/SKILL.md
   goal-nudge/SKILL.md
@@ -46,6 +49,14 @@ Each `skills/minx/<name>/` in this repo is symlinked from
 `~/.hermes/skills/minx/<name>/`. Hermes loads skills from that path; the repo
 owns the source of truth. Re-cloning on a new machine: clone this repo to
 `~/Documents/minx-hermes`, then `ln -s ~/Documents/minx-hermes/skills/minx/<name> ~/.hermes/skills/minx/<name>` for each playbook.
+
+Latest Hermes derives slash commands from SKILL frontmatter names. The Slice 9
+interactive surfaces are:
+
+- `/minx-investigate` with `/minx_investigate` alias
+- `/minx-plan` with `/minx_plan` alias
+- `/minx-retro` with `/minx_retro` alias
+- `/minx-onboard-entity` with `/minx_onboard_entity` alias
 
 ## Common tasks
 
@@ -87,6 +98,16 @@ The investigation smoke script snapshots the current max `investigations.id`,
 runs the supplied command without `eval`, then waits for a new terminal
 `investigations` row (`succeeded`, `budget_exhausted`, `failed`, or
 `cancelled`). Override the wait budget with `SMOKE_WAIT_SECONDS=<seconds>`.
+
+Smoke-test a deterministic investigation:
+
+```
+~/Documents/minx-mcp/scripts/start_hermes_stack.sh
+./scripts/smoke-investigations.sh -- \
+  python3 scripts/minx-investigate-once.py \
+    --question "Summarize my current finance state" \
+    --mode finance-summary
+```
 
 Both scripts assume the Minx MCP stack is up (ports 8000-8003); start it with
 `~/Documents/minx-mcp/scripts/start_hermes_stack.sh`.

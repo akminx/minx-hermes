@@ -122,6 +122,8 @@ PY
 wait_for_terminal_investigation() {
   local previous_id="$1"
   python3 - "$MINX_DB" "$previous_id" "$SMOKE_WAIT_SECONDS" <<'PY'
+import json
+import re
 import sqlite3
 import sys
 import time
@@ -131,6 +133,18 @@ previous_id = int(previous_id_raw)
 timeout_seconds = int(timeout_raw)
 deadline = time.monotonic() + timeout_seconds
 terminal = {"succeeded", "failed", "cancelled", "budget_exhausted"}
+DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+FORBIDDEN_KEYS = {
+    "raw",
+    "raw_output",
+    "output",
+    "result",
+    "response",
+    "messages",
+    "transcript",
+    "rows",
+    "transactions",
+}
 
 def load_new_run():
     conn = sqlite3.connect(db_path)
@@ -138,7 +152,17 @@ def load_new_run():
     try:
         row = conn.execute(
             """
-            SELECT id, kind, harness, status, started_at, completed_at, error_message, tool_call_count
+            SELECT
+              id,
+              kind,
+              harness,
+              status,
+              started_at,
+              completed_at,
+              error_message,
+              tool_call_count,
+              trajectory_json,
+              citation_refs_json
             FROM investigations
             WHERE id > ?
             ORDER BY id DESC
@@ -150,9 +174,38 @@ def load_new_run():
         conn.close()
     return None if row is None else dict(row)
 
+def validate_terminal_run(run):
+    trajectory = json.loads(run["trajectory_json"] or "[]")
+    if not isinstance(trajectory, list):
+        raise SystemExit("ERROR: trajectory_json is not a list")
+    # Empty trajectory is legitimate for failed/cancelled runs (e.g. start
+    # succeeded but the first domain call failed before we could append).
+    if run["status"] in {"succeeded", "budget_exhausted"} and not trajectory:
+        raise SystemExit(
+            "ERROR: terminal investigation has no trajectory steps for "
+            f"status={run['status']}"
+        )
+
+    for index, step in enumerate(trajectory, start=1):
+        if not isinstance(step, dict):
+            raise SystemExit(f"ERROR: trajectory step {index} is not an object")
+        for key in ("args_digest", "result_digest"):
+            if not DIGEST_RE.match(str(step.get(key, ""))):
+                raise SystemExit(f"ERROR: trajectory step {index} has invalid {key}")
+        event_slots = step.get("event_slots", {})
+        if isinstance(event_slots, dict) and FORBIDDEN_KEYS.intersection(event_slots):
+            raise SystemExit(
+                f"ERROR: trajectory step {index} stores raw-output-like event_slots keys"
+            )
+
+    citations = json.loads(run["citation_refs_json"] or "[]")
+    if citations and not isinstance(citations, list):
+        raise SystemExit("ERROR: citation_refs_json is not a list")
+
 while time.monotonic() < deadline:
     run = load_new_run()
     if run is not None and run["status"] in terminal:
+        validate_terminal_run(run)
         print(
             "  investigation row: "
             f"id={run['id']} kind={run['kind']} status={run['status']} "
